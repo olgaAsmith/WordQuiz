@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WordsTrainer — MVP</title>
+    <meta name="color-scheme" content="dark" />
+    <style>
+      :root {
+        --bg: #071425; /* очень тёмно-синий */
+        --panel: #0b1f39;
+        --panel-2: #0e2748;
+        --text: #e6eef8;
+        --muted: #99aac2;
+        --accent: #4ea1ff;
+        --accent-2: #2c82e8;
+        --success: #22c55e;
+        --error: #ef4444;
+        --border: #1b335a;
+      }
+
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+        background: #101620;
+        color: var(--text);
+      }
+
+      .container {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 24px 16px 64px;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      h1 {
+        font-size: 20px;
+        margin: 0;
+        letter-spacing: 0.3px;
+        color: #f3f7ff;
+      }
+
+      .panel {
+        background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05);
+      }
+
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+
+      input[type="file"] {
+        display: none;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-radius: 10px;
+        color: #fff;
+        background-color: #26759e; background-image: -webkit-gradient(linear, left top, left bottom, from(#26759e), to(#133d5b));
+        cursor: pointer;
+        text-decoration: none;
+        border: none;
+        user-select: none;
+        transition: transform .05s ease, filter .15s ease, box-shadow .15s ease;
+      }
+      .btn:hover { filter: brightness(1.04); }
+      .btn:active { transform: translateY(1px); }
+
+      .btn.secondary {
+        background: linear-gradient(180deg, #1e2f53 0%, #1a2a49 100%);
+        color: var(--text);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+      }
+
+      .muted { color: var(--muted); font-size: 13px; }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      thead th {
+        text-align: left;
+        font-weight: 600;
+        color: #d9e7ff;
+        background: #10284a;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border);
+      }
+      tbody td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border);
+      }
+      tbody tr:hover { background: rgba(255,255,255,0.03); }
+
+      .section-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin: 18px 0 10px;
+      }
+
+      .quiz {
+        display: grid;
+        align-items: center;
+        gap: 14px;
+      }
+      .quiz-card {
+        font-size: 18px;
+        padding: 16px;
+        background: #0f2444;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+      }
+      .options {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 10px;
+      }
+      .option {
+        padding: 12px 14px;
+        background: #10284a;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        cursor: pointer;
+        text-align: left;
+        transition: transform .05s ease, filter .15s ease, box-shadow .15s ease;
+      }
+      .option:hover { filter: brightness(1.05); }
+      .option:active { transform: translateY(1px); }
+      .option.correct { outline: 2px solid rgba(34,197,94,0.9); }
+      .option.wrong { outline: 2px solid rgba(239,68,68,0.9); }
+
+      .status {
+        font-size: 14px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        display: inline-block;
+      }
+      .status.ok { background: rgba(34,197,94,0.1); color: #9ae6b4; border: 1px solid rgba(34,197,94,0.4); }
+      .status.bad { background: rgba(239,68,68,0.1); color: #fecaca; border: 1px solid rgba(239,68,68,0.4); }
+
+      .grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .spacer { height: 8px; }
+    </style>
+  </head>
+  <body>
+    <div id="app" class="container">
+      <header>
+        <h1>WordsTrainer — тренажёр слов</h1>
+        <div class="toolbar">
+          <label class="btn" for="file-input">Загрузить CSV/XLSX</label>
+          <input
+            id="file-input"
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            @change="onFileChange"
+          />
+          <button class="btn" @click="clearWords" v-if="words.length">
+            Очистить список
+          </button>
+        </div>
+      </header>
+
+      <div class="panel grid">
+        <template v-if="mode === 'list'">
+          <div class="section-title">
+            <div>
+              <strong>Словарь</strong>
+              <span class="muted" v-if="words.length">
+                — {{ words.length }} шт.</span
+              >
+            </div>
+            <button class="btn" :disabled="words.length < 4" @click="startQuiz">
+              Начать изучать
+            </button>
+          </div>
+
+          <div class="muted" v-if="!words.length">
+            Загрузите файл CSV или XLSX - |слово|перевод|
+          </div>
+
+          <div v-if="words.length">
+            <table>
+              <thead>
+                <tr>
+                  <th>Слово</th>
+                  <th>Перевод</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(w, i) in words" :key="i">
+                  <td>{{ w.term }}</td>
+                  <td>{{ w.translation }}</td>
+                  <td style="width:1%; white-space: nowrap; text-align:right;">
+                    <button class="btn secondary" @click="removeWord(i)">
+                      Удалить
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </template>
+
+        <template v-else-if="mode === 'quiz'">
+          <div class="section-title">
+            <div>
+              <strong>Викторина</strong>
+              <span class="muted">
+                — вопрос {{ currentQuestionIndex + 1 }} из {{ quizOrder.length
+                }}</span
+              >
+            </div>
+            <button class="btn secondary" @click="exitQuiz">К списку</button>
+          </div>
+
+          <div class="quiz">
+            <div class="quiz-card">
+              <div class="muted">Выберите перевод слова:</div>
+              <div style="font-size:22px; margin-top:6px;">
+                {{ currentQuestion.term }}
+              </div>
+            </div>
+
+            <div class="options">
+              <button
+                v-for="(opt, idx) in currentOptions"
+                :key="idx"
+                class="option"
+                :class="{ correct: answered && idx === correctOptionIndex, wrong: answered && idx === selectedOptionIndex && idx !== correctOptionIndex }"
+                :disabled="answered"
+                @click="choose(idx)"
+              >
+                {{ opt }}
+              </button>
+            </div>
+
+            <div class="spacer"></div>
+
+            <div v-if="answered">
+              <span class="status" :class="{ ok: isCorrect, bad: !isCorrect }">
+                {{ isCorrect ? 'Верно!' : 'Неверно' }}
+              </span>
+            </div>
+
+            <div>
+              <button
+                class="btn"
+                :disabled="!answered || (answered && isCorrect)"
+                @click="nextQuestion"
+              >
+                {{ currentQuestionIndex + 1 === quizOrder.length ? 'Завершить' :
+                'Далее' }}
+              </button>
+              <span class="muted" style="margin-left:10px;"
+                >Счёт: {{ score }} / {{ quizOrder.length }}</span
+              >
+              <span
+                class="muted"
+                v-if="answered && isCorrect"
+                style="margin-left:10px;"
+                >Автопереход через 2 сек…</span
+              >
+            </div>
+          </div>
+        </template>
+
+        <template v-else-if="mode === 'result'">
+          <div class="grid" style="align-items:flex-start;">
+            <div class="quiz-card">
+              <div style="font-size:18px; margin-bottom:6px;">Результат</div>
+              <div class="muted">Вы прошли {{ quizOrder.length }} слов.</div>
+              <div style="margin-top:6px;">
+                Счёт: <strong>{{ score }}</strong> / {{ quizOrder.length }}
+              </div>
+            </div>
+            <div class="toolbar">
+              <button class="btn" @click="restartQuiz">Пройти ещё раз</button>
+              <button class="btn secondary" @click="exitQuiz">К списку</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Vue 3 (CDN) -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <!-- PapaParse for CSV -->
+    <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+    <!-- SheetJS for XLSX -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script>
+      const { createApp, reactive, computed, onMounted, watch } = Vue;
+
+      function shuffleInPlace(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+      }
+
+      function pickDistinctRandomIndices(poolSize, count, excludeIndex) {
+        const indices = [];
+        while (indices.length < count) {
+          const idx = Math.floor(Math.random() * poolSize);
+          if (idx === excludeIndex) continue;
+          if (!indices.includes(idx)) indices.push(idx);
+        }
+        return indices;
+      }
+
+      createApp({
+        setup() {
+          const state = reactive({
+            mode: 'list', // 'list' | 'quiz' | 'result'
+            words: [], // { term, translation }[]
+            // quiz state
+            quizOrder: [],
+            currentQuestionIndex: 0,
+            currentOptions: [],
+            correctOptionIndex: -1,
+            selectedOptionIndex: -1,
+            answered: false,
+            isCorrect: false,
+            score: 0,
+            autoAdvanceTimerId: null,
+          });
+
+          const currentQuestion = computed(() => {
+            if (!state.quizOrder.length) return { term: '', translation: '' };
+            const idx = state.quizOrder[state.currentQuestionIndex] ?? 0;
+            return state.words[idx] || { term: '', translation: '' };
+          });
+
+          function saveToLocalStorage() {
+            try {
+              localStorage.setItem('wordsTrainer.words', JSON.stringify(state.words));
+            } catch (e) {
+              console.warn('LocalStorage save failed', e);
+            }
+          }
+
+          function loadFromLocalStorage() {
+            try {
+              const raw = localStorage.getItem('wordsTrainer.words');
+              if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                  state.words = parsed.filter(r => r && r.term && r.translation);
+                }
+              }
+            } catch (e) {
+              console.warn('LocalStorage load failed', e);
+            }
+          }
+
+          function clearWords() {
+            state.words = [];
+            saveToLocalStorage();
+          }
+
+          function removeWord(index) {
+            if (index < 0 || index >= state.words.length) return;
+            state.words.splice(index, 1);
+            saveToLocalStorage();
+          }
+
+          async function onFileChange(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+            const name = file.name.toLowerCase();
+            if (name.endsWith('.csv')) {
+              parseCSV(file);
+            } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+              parseXLSX(file);
+            } else {
+              alert('Поддерживаются только CSV и XLSX/XLS');
+            }
+            // reset value to allow re-upload same file
+            event.target.value = '';
+          }
+
+          function normalizeRows(rows) {
+            const result = [];
+            for (const row of rows) {
+              if (!row) continue;
+              const a = (row[0] ?? '').toString().trim();
+              const b = (row[1] ?? '').toString().trim();
+              if (a && b) result.push({ term: a, translation: b });
+            }
+            return result;
+          }
+
+          function parseCSV(file) {
+            Papa.parse(file, {
+              complete: (res) => {
+                const rows = res.data || [];
+                const words = normalizeRows(rows);
+                if (!words.length) {
+                  alert('Не удалось прочитать данные. Проверьте, что в файле два столбца.');
+                  return;
+                }
+                state.words = words;
+                saveToLocalStorage();
+              },
+              error: (err) => {
+                console.error(err);
+                alert('Ошибка при чтении CSV');
+              },
+              skipEmptyLines: true,
+            });
+          }
+
+          function parseXLSX(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              try {
+                const data = new Uint8Array(e.target.result);
+                const wb = XLSX.read(data, { type: 'array' });
+                const firstSheetName = wb.SheetNames[0];
+                const sheet = wb.Sheets[firstSheetName];
+                const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+                const words = normalizeRows(rows);
+                if (!words.length) {
+                  alert('Не удалось прочитать данные из XLSX. Нужно 2 столбца.');
+                  return;
+                }
+                state.words = words;
+                saveToLocalStorage();
+              } catch (err) {
+                console.error(err);
+                alert('Ошибка при чтении XLSX');
+              }
+            };
+            reader.readAsArrayBuffer(file);
+          }
+
+          function clearAutoTimer() {
+            if (state.autoAdvanceTimerId) {
+              clearTimeout(state.autoAdvanceTimerId);
+              state.autoAdvanceTimerId = null;
+            }
+          }
+
+          function startQuiz() {
+            if (state.words.length < 4) {
+              alert('Нужно минимум 4 слова для викторины.');
+              return;
+            }
+            // создаём случайный порядок вопросов
+            const order = Array.from({ length: state.words.length }, (_, i) => i);
+            shuffleInPlace(order);
+            state.quizOrder = order;
+            state.currentQuestionIndex = 0;
+            state.score = 0;
+            prepareOptions();
+            state.mode = 'quiz';
+          }
+
+          function prepareOptions() {
+            clearAutoTimer();
+            state.selectedOptionIndex = -1;
+            state.answered = false;
+            state.isCorrect = false;
+            const qIndex = state.quizOrder[state.currentQuestionIndex];
+            const correct = state.words[qIndex];
+            // собрать 3 уникальных других перевода
+            const distractorIndices = pickDistinctRandomIndices(state.words.length, 3, qIndex);
+            const variants = [correct.translation, ...distractorIndices.map(i => state.words[i].translation)];
+            shuffleInPlace(variants);
+            state.currentOptions = variants;
+            state.correctOptionIndex = state.currentOptions.indexOf(correct.translation);
+          }
+
+          function choose(idx) {
+            if (state.answered) return;
+            state.selectedOptionIndex = idx;
+            state.answered = true;
+            state.isCorrect = idx === state.correctOptionIndex;
+            if (state.isCorrect) state.score++;
+            clearAutoTimer();
+            if (state.isCorrect) {
+              state.autoAdvanceTimerId = setTimeout(() => {
+                state.autoAdvanceTimerId = null;
+                nextQuestion();
+              }, 1000);
+            }
+          }
+
+          function nextQuestion() {
+            if (!state.answered) return;
+            clearAutoTimer();
+            const last = state.currentQuestionIndex + 1 >= state.quizOrder.length;
+            if (last) {
+              state.mode = 'result';
+            } else {
+              state.currentQuestionIndex += 1;
+              prepareOptions();
+            }
+          }
+
+          function exitQuiz() {
+            clearAutoTimer();
+            state.mode = 'list';
+          }
+
+          function restartQuiz() {
+            clearAutoTimer();
+            startQuiz();
+          }
+
+          onMounted(() => {
+            loadFromLocalStorage();
+          });
+
+          watch(() => state.words, () => saveToLocalStorage(), { deep: true });
+
+          return {
+            // state
+            mode: Vue.toRef(state, 'mode'),
+            words: Vue.toRef(state, 'words'),
+            quizOrder: Vue.toRef(state, 'quizOrder'),
+            currentQuestionIndex: Vue.toRef(state, 'currentQuestionIndex'),
+            currentOptions: Vue.toRef(state, 'currentOptions'),
+            correctOptionIndex: Vue.toRef(state, 'correctOptionIndex'),
+            selectedOptionIndex: Vue.toRef(state, 'selectedOptionIndex'),
+            answered: Vue.toRef(state, 'answered'),
+            isCorrect: Vue.toRef(state, 'isCorrect'),
+            score: Vue.toRef(state, 'score'),
+
+            currentQuestion,
+
+            // actions
+            onFileChange,
+            startQuiz,
+            nextQuestion,
+            choose,
+            exitQuiz,
+            restartQuiz,
+            clearWords,
+            removeWord,
+            clearAutoTimer,
+          };
+        },
+      }).mount('#app');
+    </script>
+  </body>
+</html>
