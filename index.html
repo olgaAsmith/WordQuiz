@@ -166,11 +166,45 @@
       }
 
       .spacer { height: 8px; }
+
+      @media (max-width: 768px) {
+        header {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 8px;
+        }
+        .section-title {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 8px;
+        }
+        .table-button {
+            font-size: 0;
+            gap: 0;
+            padding: 4px;
+            background: none !important;
+          }
+
+          .table-button::after {
+            content: "✕";
+            font-size: 20px;
+            line-height: 1;
+          }
+
+          tbody td {
+            padding: 4px;
+            font-size: 12px;
+          }
+
+          .panel {
+            padding: 8px;
+          }
+      }
     </style>
   </head>
   <body>
     <div id="app" class="container">
-      <header>
+      <header v-if="mode === 'list'">
         <h1>WordsTrainer — тренажёр слов</h1>
         <div class="toolbar">
           <label class="btn" for="file-input">Загрузить CSV/XLSX</label>
@@ -217,8 +251,8 @@
                 <tr v-for="(w, i) in words" :key="i">
                   <td>{{ w.term }}</td>
                   <td>{{ w.translation }}</td>
-                  <td style="width:1%; white-space: nowrap; text-align:right;">
-                    <button class="btn secondary" @click="removeWord(i)">
+                  <td>
+                    <button class="btn secondary table-button" @click="removeWord(i)">
                       Удалить
                     </button>
                   </td>
